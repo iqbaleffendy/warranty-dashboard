@@ -7,11 +7,12 @@ library(readxl)
 library(DT)
 library(plotly)
 library(formattable)
+library(lubridate)
 
 
 # Load Dataset----
 warrantydata <- read_excel("import_data/warrantyclaim.xlsx")
-warrantydata <- warrantydata %>% 
+warrantydatasum <- warrantydata %>% 
   select(DealerClaim, JobOrder) %>% 
   filter(!is.na(JobOrder)) %>% 
   group_by(JobOrder) %>% 
@@ -24,16 +25,31 @@ failuredata$BranchCode <- as.character(failuredata$BranchCode)
 branch <- read_excel("import_data/branch.xlsx")
 branch$BranchCode <- as.character(branch$BranchCode)
 
-failuredata <- failuredata %>% 
-  left_join(warrantydata, by = c("JobNo" = "JobOrder")) %>% 
+population <- read_excel("import_data/nhpopulasi.xlsx")
+population <- population %>% 
+  select(1,4,5) %>% 
+  rename(
+    "UnitSN" = `Serial Number`, 
+    "WarrantyStartDate" = `Warranty Start Date`, 
+    "WarrantyEndDate" = `Warranty End Date`
+  ) %>% 
+  mutate(
+    WarrantyStartDate = as.Date(WarrantyStartDate, "%d/%m/%Y"),
+    WarrantyEndDate = as.Date(WarrantyEndDate, "%d/%m/%Y")
+  )
+
+failuredata <- failuredata %>%
+  filter(!is.na(UnitSN)) %>%
+  left_join(warrantydatasum, by = c("JobNo" = "JobOrder")) %>% 
   mutate(
     ClaimStatus = case_when(
       is.na(DealerClaimNo) ~ "Not Claimed",
       TRUE ~ "Claimed"
     )
   ) %>% 
-  left_join(branch, by = "BranchCode")
-
+  left_join(branch, by = "BranchCode") %>% 
+  left_join(population, by = "UnitSN") %>% 
+  mutate(WarrantyEnd = as.numeric(difftime(WarrantyEndDate, Sys.Date(), units = "days")))
 
 ui <- fluidPage(
   
@@ -136,7 +152,7 @@ server <- function(input, output) {
     failuredata
   })
   
-  # Output Service Level Percentage----
+  # Output Warranty Claim Sum----
   output$claimsum <- renderValueBox({
     warrantyclaimsum <- 
       claim_filtered() %>%
@@ -151,7 +167,7 @@ server <- function(input, output) {
     )
   })
   
-  # Output Service Level Value----
+  # Output Warranty Percentage----
   output$claimpercentage <- renderValueBox({
     warrantypct <- 
       claim_filtered() %>% 
@@ -169,7 +185,7 @@ server <- function(input, output) {
     )
   })
   
-  # Function for Service Level Plot----
+  # Function for Warranty Plot----
   warrantyclaimplot <- function(data, group) {
     data %>% 
       count({{group}}, ClaimStatus) %>%
@@ -185,7 +201,7 @@ server <- function(input, output) {
       layout(legend = list(x = 0.7, y = 0.8, bgcolor = "#E2E2E2"))
   }
   
-  # Output Service Level Plot----
+  # Output Warranty Plot----
   output$claimplot <- renderPlotly({
     if (input$branchname == "All") {
       warrantyclaimplot(claim_filtered(), Branch)
@@ -201,11 +217,16 @@ server <- function(input, output) {
     )
   })
   
-  # Output Service Level Dataset----
+  # Output Warranty Dataset----
   output$claimdataset <- renderDT({
     datatable(
-      claim_filtered() %>% select(1,4,5,8,11,19,20),
-      class = 'cell-border stripe'
+      claim_filtered() %>% select(1,4,5,8,11,19,20,26,27),
+      class = 'cell-border stripe',
+      options = list(
+        scrollX = TRUE, 
+        autoWidth = TRUE,
+        columnDefs = list(list(width = '150px', targets = 1))
+      )
     )
   })
   
