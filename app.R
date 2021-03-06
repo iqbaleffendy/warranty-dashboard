@@ -5,9 +5,9 @@ library(shinythemes)
 library(tidyverse)
 library(readxl)
 library(DT)
-library(plotly)
 library(formattable)
 library(lubridate)
+library(highcharter)
 
 
 # Load Dataset----
@@ -98,13 +98,13 @@ ui <- fluidPage(
                   valueBoxOutput("claimsum", width = NULL)
                 ),
                 column(
-                  width = 5,
+                  width = 4,
                   offset = 0,
                   valueBoxOutput("claimpercentage", width = NULL)
                 )
               ),
               fluidRow(
-                plotlyOutput("claimplot")
+                highchartOutput("claimplot")
               )
             ),
             tabPanel(
@@ -192,17 +192,15 @@ server <- function(input, output) {
       group_by({{group}}) %>% 
       mutate(Total = sum(n)) %>% 
       ungroup() %>% 
-      mutate(group = fct_reorder({{group}}, Total, .desc = TRUE)) %>% 
-      plot_ly(x = ~group, y = ~n, type = "bar", color = ~ClaimStatus) %>% 
-      layout(barmode = "stack") %>% 
-      layout(legend = list(orientation = "h")) %>% 
-      layout(xaxis = list(title = "", tickangle = -45)) %>% 
-      layout(yaxis = list(title = "")) %>% 
-      layout(legend = list(x = 0.7, y = 0.8, bgcolor = "#E2E2E2"))
+      mutate(group = fct_reorder({{group}}, Total, .desc = TRUE)) %>%
+      arrange(desc(Total)) %>% 
+      hchart("column", hcaes(x = group, y = n, group = ClaimStatus), stacking = "normal") %>% 
+      hc_xAxis(title = list(text = "")) %>%
+      hc_yAxis(title = list(text = ""))
   }
   
   # Output Warranty Plot----
-  output$claimplot <- renderPlotly({
+  output$claimplot <- renderHighchart({
     if (input$branchname == "All") {
       warrantyclaimplot(claim_filtered(), Branch)
     } else {
