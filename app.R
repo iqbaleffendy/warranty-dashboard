@@ -49,7 +49,8 @@ failuredata <- failuredata %>%
   ) %>% 
   left_join(branch, by = "BranchCode") %>% 
   left_join(population, by = "UnitSN") %>% 
-  mutate(WarrantyEnd = as.numeric(difftime(WarrantyEndDate, Sys.Date(), units = "days")))
+  mutate(WarrantyEnd = as.numeric(difftime(WarrantyEndDate, Sys.Date(), units = "days"))) %>% 
+  mutate(Branch = as.factor(Branch), UnitModel = as.factor(UnitModel))
 
 ui <- fluidPage(
   
@@ -69,13 +70,13 @@ ui <- fluidPage(
           selectInput(
             inputId = "branchname",
             label = "Select Branch",
-            choices = c("All", unique(failuredata$Branch)),
+            choices = c("All", levels(failuredata$Branch)),
             selected = "All"
           ),
           selectInput(
             inputId = "unitmodel",
             label = "Select Unit Model",
-            choices = c("All", unique(failuredata$UnitModel)),
+            choices = c("All", levels(failuredata$UnitModel)),
             selected = "All"
           ),
           selectInput(
